@@ -30,7 +30,7 @@ void main(triangle GSIn input[3], inout TriangleStream<GSOut> stream)
 	{
 		GSOut output;
 
-		output.Position.xyz = (input[i].Position.xyz/* - CameraPosition*/) / VoxelHalfExtent;
+		output.Position.xyz = (input[i].Position.xyz /*- CameraPosition*/) / VoxelHalfExtent;
 		
 		[flatten]
 		if (max == 0)

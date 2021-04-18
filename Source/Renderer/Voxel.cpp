@@ -1,16 +1,17 @@
 #include "Voxel.h"
 #include "GBuffer.h"
 
-#include <mutex>
-
 namespace Voxel 
 {
 
 	ID3D11Texture3D* m_DiffuseTexture = nullptr;
 	ID3D11ShaderResourceView* DiffuseReadView = nullptr;
+	ID3D11UnorderedAccessView* m_DiffuseTextureView = nullptr;
+	ID3D11Texture3D* m_MidTexture = nullptr;
+	ID3D11ShaderResourceView* m_MidReadView = nullptr;
+	ID3D11UnorderedAccessView* m_MidTextureView = nullptr;
 	ID3D11Buffer* m_VoxelBuffer = nullptr;
 	ID3D11UnorderedAccessView* m_VoxelView = nullptr;
-	ID3D11UnorderedAccessView* m_DiffuseTextureView = nullptr;
 	ID3D11RasterizerState2* m_RasterizerState = nullptr;
 	D3D11_VIEWPORT m_Viewport;
 
@@ -88,6 +89,9 @@ namespace Voxel
 		m_DiffuseTexture->Release();
 		DiffuseReadView->Release();
 		m_DiffuseTextureView->Release();
+		if (m_MidTexture) m_DiffuseTexture->Release();
+		if (m_MidReadView) DiffuseReadView->Release();
+		if (m_MidTextureView) m_DiffuseTextureView->Release();
 		m_VoxelBuffer->Release();
 		m_VoxelView->Release();
 
@@ -141,16 +145,15 @@ namespace Voxel
 		Window::Context->CSSetShader(m_CopyCS, nullptr, 0);
 		Window::Context->CSSetConstantBuffers(1, 1, &ConstantBuffer);
 		Window::Context->CSSetUnorderedAccessViews(0, 1, &m_VoxelView, nullptr);
-		Window::Context->CSSetUnorderedAccessViews(1, 1, &m_DiffuseTextureView, nullptr);
-		auto threadCount = uint32_t(m_CBuffer.VoxelGridRes);
-		threadCount = (threadCount * threadCount * threadCount + 255) / 255;
-		Window::Context->Dispatch(threadCount, 1, 1);
+		Window::Context->CSSetUnorderedAccessViews(1, 1, &m_MidTextureView, nullptr);
+		auto dimensions = uint32_t(m_CBuffer.VoxelGridRes) / 8 + 1;
+		Window::Context->Dispatch(dimensions, dimensions, dimensions);
 
-		// Window::Context->CSSetShader(m_BounceCS, nullptr, 0);
-		// Window::Context->CSSetShaderResources(3, 1, &Voxel::DiffuseReadView);
-		// Window::Context->CSSetSamplers(0, 1, &GBuffer::SamplerState);
-		// auto dimensions = uint32_t(m_CBuffer.VoxelGridRes) / 8 + 1;
-		// Window::Context->Dispatch(dimensions, dimensions, dimensions);
+		Window::Context->CSSetShader(m_BounceCS, nullptr, 0);
+		Window::Context->CSSetUnorderedAccessViews(1, 1, &m_DiffuseTextureView, nullptr);
+		Window::Context->CSSetShaderResources(3, 1, &Voxel::m_MidReadView);
+		Window::Context->CSSetSamplers(0, 1, &GBuffer::SamplerState);
+		Window::Context->Dispatch(dimensions, dimensions, dimensions);
 
 		ID3D11UnorderedAccessView* views[] = { nullptr, nullptr };
 		Window::Context->CSSetUnorderedAccessViews(0, 2, views, nullptr);
@@ -187,7 +190,12 @@ namespace Voxel
 	{
 		if (m_DiffuseTexture) m_DiffuseTexture->Release();
 		if (DiffuseReadView) DiffuseReadView->Release();
+		if (m_DiffuseTextureView) m_DiffuseTextureView->Release();
+		if (m_MidTexture) m_DiffuseTexture->Release();
+		if (m_MidReadView) DiffuseReadView->Release();
+		if (m_MidTextureView) m_DiffuseTextureView->Release();
 		if (m_VoxelBuffer) m_VoxelBuffer->Release();
+		if (m_VoxelView) m_VoxelView->Release();
 
 		D3D11_TEXTURE3D_DESC desc{
 			.Width = res,
@@ -199,6 +207,7 @@ namespace Voxel
 			.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS
 		};
 		Window::Device->CreateTexture3D(&desc, nullptr, &m_DiffuseTexture);
+		Window::Device->CreateTexture3D(&desc, nullptr, &m_MidTexture);
 
 		D3D11_UNORDERED_ACCESS_VIEW_DESC utDesc{
 			.Format = DXGI_FORMAT_R8G8B8A8_UNORM,
@@ -206,6 +215,7 @@ namespace Voxel
 			.Texture3D = D3D11_TEX3D_UAV{.MipSlice = 0, .FirstWSlice = 0, .WSize = res }
 		};
 		Window::Device->CreateUnorderedAccessView(m_DiffuseTexture, &utDesc, &m_DiffuseTextureView);
+		Window::Device->CreateUnorderedAccessView(m_MidTexture, &utDesc, &m_MidTextureView);
 
 		D3D11_SHADER_RESOURCE_VIEW_DESC rDesc{
 			.Format = DXGI_FORMAT_R8G8B8A8_UNORM,
@@ -213,6 +223,7 @@ namespace Voxel
 			.Texture3D = D3D11_TEX3D_SRV{.MostDetailedMip = 0, .MipLevels = UINT(-1) }
 		};
 		Window::Device->CreateShaderResourceView(m_DiffuseTexture, &rDesc, &DiffuseReadView);
+		Window::Device->CreateShaderResourceView(m_MidTexture, &rDesc, &m_MidReadView);
 
 		D3D11_BUFFER_DESC bDesc{
 			.ByteWidth = 8 * res * res * res,
@@ -230,8 +241,8 @@ namespace Voxel
 		};
 		Window::Device->CreateUnorderedAccessView(m_VoxelBuffer, &uDesc, &m_VoxelView);
 
-		m_Viewport.Width = float(res);
-		m_Viewport.Height = float(res);
+		m_Viewport.Width = float(res) * 2.f;
+		m_Viewport.Height = float(res) * 2.f;
 		m_Viewport.MinDepth = 0.f;
 		m_Viewport.MaxDepth = 1.f;
 		m_Viewport.TopLeftX = 0.f;

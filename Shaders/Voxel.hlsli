@@ -135,22 +135,17 @@ float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
 	float3 color = 0;
 	float alpha = 0;
 	
-	// We need to offset the cone start position to avoid sampling its own voxel (self-occlusion):
-	//	Unfortunately, it will result in disconnection between nearby surfaces :(
 	float dist = VoxelHalfExtent; // offset by cone dir so that first sample of all cones are not the same
 	float3 startPos = P + N * VoxelHalfExtent * 2.f * 1.41421f; // sqrt2 is diagonal voxel half-extent
 
 	float maxDistance = VoxelHalfExtent * 2.f * VoxelGridRes;
-	// We will break off the loop if the sampling distance is too far for performance reasons:
 	while (dist < maxDistance && alpha < 1.f)
 	{
 		float diameter = max(VoxelHalfExtent, 2 * coneAperture * dist);
 		float mip = log2(diameter / VoxelHalfExtent);
 
-		// Because we do the ray-marching in world space, we need to remap into 3d texture space before sampling:
-		//	todo: optimization could be doing ray-marching in texture space
 		float3 tc = startPos + coneDirection * dist;
-		tc = (tc/* - CameraPosition*/) / VoxelHalfExtent;
+		tc = (tc /*- CameraPosition*/) / VoxelHalfExtent;
 		tc /= VoxelGridRes;
 		tc = tc * float3(0.5f, -0.5f, 0.5f) + 0.5f;
 
@@ -159,13 +154,11 @@ float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
 
 		float4 sam = VoxelTexture.SampleLevel(Sampler, tc, mip);
 
-		// this is the correct blending to avoid black-staircase artifact (ray stepped front-to back, so blend front to back):
 		float a = 1 - alpha;
 		color += a * sam.rgb;
 		alpha += a * sam.a;
 
-		// step along ray:
-		dist += diameter * 0.5f;
+		dist += diameter * (VoxelHalfExtent / 32.f);
 	}
 
 	return float4(color, alpha);
@@ -177,10 +170,8 @@ float4 ConeTraceRadiance(float3 P, float3 N)
 
 	for (uint cone = 0; cone < 16; cone++) // quality is between 1 and 16 cones
 	{
-		// approximate a hemisphere from random points inside a sphere:
-		//  (and modulate cone with surface normal, no banding this way)
 		float3 coneDirection = normalize(CONES[cone] + N);
-		// if point on sphere is facing below normal (so it's located on bottom hemisphere), put it on the opposite hemisphere instead:
+		// flip if pointing below
 		coneDirection *= dot(coneDirection, N) < 0 ? -1 : 1;
 
 		radiance += ConeTrace(P, N, coneDirection, tan(3.141527f * 0.5f * 0.33f));

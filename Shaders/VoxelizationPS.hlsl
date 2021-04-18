@@ -26,7 +26,7 @@ void main(PSIn input)
 		output.xyz += col;
 	}
 	
-	float3 diff = (input.WorldPosition/* - CameraPosition*/) / (VoxelGridRes * VoxelHalfExtent);
+	float3 diff = (input.WorldPosition /*- CameraPosition*/) / (VoxelGridRes * VoxelHalfExtent);
 	float3 uvw = diff * float3(0.5f, -0.5f, 0.5f) + 0.5f;
 	uint3 coords = floor(uvw * VoxelGridRes);
 	
