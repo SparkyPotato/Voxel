@@ -12,18 +12,21 @@ struct PSIn
 	float3 Tangent : TANGENT;
 	float3 Bitangent : BITANGENT;
 	float2 UV : UV;
+	nointerpolation float Area : AREA;
 };
 
 void main(PSIn input)
 {
 	float3 color = AlbedoMap.Sample(Sampler, input.UV).xyz;
 	
-	float NdotL = dot(input.Normal, LightDirection);
 	float4 output = float4(0.f, 0.f, 0.f, 1.f);
+	float NdotL = dot(input.Normal, LightDirection);
+	
+	[flatten]
 	if (NdotL > 0.f)
 	{
-		float3 col = NdotL * LightIntensity * color * LightColor;
-		output.xyz += col;
+		float3 col = NdotL * LightIntensity * LightColor * color;
+		output.rgb = col;
 	}
 	
 	float3 diff = (input.WorldPosition /*- CameraPosition*/) / (VoxelGridRes * VoxelHalfExtent);
@@ -32,5 +35,5 @@ void main(PSIn input)
 	
 	uint id = Flatten(coords, VoxelGridRes);
 	InterlockedMax(VoxelGrid[id].Direct, EncodeColor(output));
-	InterlockedMax(VoxelGrid[id].Normal, EncodeNormal(input.Normal));
+	InterlockedMax(VoxelGrid[id].Normal, EncodeNormal(input.Area, input.Normal));
 }
