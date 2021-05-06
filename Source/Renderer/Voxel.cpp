@@ -1,5 +1,7 @@
 #include "Voxel.h"
+
 #include "GBuffer.h"
+#include "ShadowMap.h"
 
 namespace Voxel 
 {
@@ -16,7 +18,6 @@ namespace Voxel
 	D3D11_VIEWPORT m_Viewport;
 
 	ID3D11Buffer* ConstantBuffer = nullptr;
-	ID3D11Buffer* LightBuffer = nullptr;
 	ID3D11VertexShader* m_VS = nullptr;
 	ID3D11GeometryShader* m_GS = nullptr;
 	ID3D11PixelShader* m_PS = nullptr;
@@ -78,14 +79,12 @@ namespace Voxel
 			.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE
 		};
 		Window::Device->CreateBuffer(&cDesc, nullptr, &ConstantBuffer);
-		Window::Device->CreateBuffer(&cDesc, nullptr, &LightBuffer);
 	}
 
 	void Shutdown()
 	{
 		m_RasterizerState->Release();
 		ConstantBuffer->Release();
-		LightBuffer->Release();
 		m_DiffuseTexture->Release();
 		DiffuseReadView->Release();
 		m_DiffuseTextureView->Release();
@@ -130,8 +129,11 @@ namespace Voxel
 		Window::Context->IASetInputLayout(GBuffer::Layout);
 		Window::Context->GSSetConstantBuffers(1, 1, &ConstantBuffer);
 		Window::Context->PSSetConstantBuffers(1, 1, &ConstantBuffer);
-		Window::Context->PSSetConstantBuffers(2, 1, &LightBuffer);
+		Window::Context->PSSetConstantBuffers(2, 1, &ShadowMap::LightBuffer);
+		Window::Context->PSSetConstantBuffers(3, 1, &ShadowMap::LightMatrix);
+		Window::Context->PSSetShaderResources(4, 1, &ShadowMap::ShadowMapView);
 		Window::Context->PSSetSamplers(0, 1, &GBuffer::SamplerState);
+		Window::Context->PSSetSamplers(2, 1, &ShadowMap::Sampler);
 
 		for (const auto& material : scene->Materials)
 		{
@@ -250,16 +252,6 @@ namespace Voxel
 
 		m_CBuffer.VoxelGridRes = float(res);
 		m_CBuffer.VoxelHalfExtent = halfExtent;
-	}
-
-	void SetLightData(DirectX::XMFLOAT3 direction, float intensity, DirectX::XMFLOAT3 color)
-	{
-		D3D11_MAPPED_SUBRESOURCE sub;
-		Window::Context->Map(LightBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-		memcpy(sub.pData, &direction, sizeof(direction));
-		memcpy((uint8_t*)sub.pData + sizeof(direction), &intensity, sizeof(intensity));
-		memcpy((uint8_t*)sub.pData + sizeof(DirectX::XMFLOAT4), &color, sizeof(color));
-		Window::Context->Unmap(LightBuffer, 0);
 	}
 
 }

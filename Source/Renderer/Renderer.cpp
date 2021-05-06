@@ -7,34 +7,27 @@
 #include "GBuffer.h"
 #include "Voxel.h"
 #include "Finalizer.h"
+#include "ShadowMap.h"
 
 namespace Renderer
 {
 	std::string m_CurrentScenePath;
 	Scene m_CurrentScene;
 
-	struct Camera
-	{
-		DirectX::XMVECTOR Position;
-		DirectX::XMVECTOR Rotation;
-	};
 	Camera m_Camera;
 
-	struct LightData
-	{
-		DirectX::XMFLOAT3 Direction = { 0.f, 1.f, 0.f };
-		float Intensity = 1.5f;
-		DirectX::XMFLOAT3 Color = { 1.f, 1.f, 1.f };
-	};
-	LightData m_Light;
+	Light m_Light;
 
 	void Initialize()
 	{
 		GBuffer::Initialize();
+		ShadowMap::Initialize();
 		Voxel::Initialize();
-		Voxel::Resize(128, 16.f);
-		Voxel::SetLightData(m_Light.Direction, m_Light.Intensity, m_Light.Color);
 		Finalizer::Initialize();
+
+		Voxel::Resize(128, 16.f);
+		ShadowMap::Resize(4096);
+		ShadowMap::SetLight(m_Light);
 
 		m_Camera.Position = DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f);
 		m_Camera.Rotation = DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f);
@@ -44,6 +37,7 @@ namespace Renderer
 	{
 		Finalizer::Shutdown();
 		Voxel::Shutdown();
+		ShadowMap::Shutdown();
 		GBuffer::Shutdown();
 	}
 
@@ -102,7 +96,7 @@ namespace Renderer
 
 		if (change)
 		{
-			Voxel::SetLightData(m_Light.Direction, m_Light.Intensity, m_Light.Color);
+			ShadowMap::SetLight(m_Light);
 		}
 	}
 
@@ -206,6 +200,7 @@ namespace Renderer
 
 		DirectX::XMFLOAT3 pos;
 		DirectX::XMStoreFloat3(&pos, m_Camera.Position);
+		ShadowMap::Write(&m_CurrentScene);
 		Voxel::Voxelize(&m_CurrentScene, pos);
 		GBuffer::Write(&m_CurrentScene);
 

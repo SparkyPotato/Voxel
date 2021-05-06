@@ -34,6 +34,6 @@ void main(PSIn input)
 	uint3 coords = floor(uvw * VoxelGridRes);
 	
 	uint id = Flatten(coords, VoxelGridRes);
-	InterlockedMax(VoxelGrid[id].Direct, EncodeColor(output));
+	InterlockedMax(VoxelGrid[id].Direct, EncodeColor(output * Shadow(input.WorldPosition, input.Normal)));
 	InterlockedMax(VoxelGrid[id].Normal, EncodeNormal(input.Area, input.Normal));
 }

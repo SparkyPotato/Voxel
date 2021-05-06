@@ -17,10 +17,12 @@ namespace GBuffer
 	void Resize(uint32_t width, uint32_t height);
 
 	extern ID3D11Buffer* CameraBuffer;
+	extern ID3D11VertexShader* WriteVS;
 	extern ID3D11InputLayout* Layout;
 	extern ID3D11ShaderResourceView* Views[3];
 	extern ID3D11VertexShader* ReadVS;
 	extern D3D11_VIEWPORT Viewport;
 	extern ID3D11SamplerState* SamplerState;
+	extern ID3D11DepthStencilState* DepthState;
 
 }

@@ -5,13 +5,13 @@ namespace GBuffer
 
 	ID3D11RenderTargetView* m_Buffers[2] = { nullptr, nullptr };
 	ID3D11DepthStencilView* m_DepthBuffer = nullptr;
-	ID3D11DepthStencilState* m_DepthState = nullptr;
+	ID3D11DepthStencilState* DepthState = nullptr;
 	ID3D11SamplerState* SamplerState = nullptr;
 	ID3D11ShaderResourceView* Views[3] = { nullptr, nullptr, nullptr };
 
 	D3D11_VIEWPORT Viewport;
 	ID3D11InputLayout* Layout = nullptr;
-	ID3D11VertexShader* m_WriteVS = nullptr;
+	ID3D11VertexShader* WriteVS = nullptr;
 	ID3D11PixelShader* m_WritePS = nullptr;
 	ID3D11Buffer* CameraBuffer = nullptr;
 	ID3D11Buffer* m_WritePSBuffer = nullptr;
@@ -27,7 +27,7 @@ namespace GBuffer
 	{
 		ID3DBlob* blob;
 		D3DReadFileToBlob(L"GBufferWriteVS.cso", &blob);
-		Window::Device->CreateVertexShader(blob->GetBufferPointer(), blob->GetBufferSize(), nullptr, &m_WriteVS);
+		Window::Device->CreateVertexShader(blob->GetBufferPointer(), blob->GetBufferSize(), nullptr, &WriteVS);
 
 		D3D11_INPUT_ELEMENT_DESC iaDesc[] =
 		{
@@ -63,7 +63,7 @@ namespace GBuffer
 			.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL,
 			.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL
 		};
-		Window::Device->CreateDepthStencilState(&desc, &m_DepthState);
+		Window::Device->CreateDepthStencilState(&desc, &DepthState);
 
 		D3D11_BUFFER_DESC cDesc{
 			.ByteWidth = sizeof(DirectX::XMFLOAT4X4) * 2,
@@ -93,7 +93,7 @@ namespace GBuffer
 	{
 		Layout->Release();
 		SamplerState->Release();
-		m_WriteVS->Release();
+		WriteVS->Release();
 		m_WritePS->Release();
 		CameraBuffer->Release();
 		m_WritePSBuffer->Release();
@@ -102,7 +102,7 @@ namespace GBuffer
 		m_ReadPS->Release();
 		m_ReadPSBuffer->Release();
 
-		m_DepthState->Release();
+		DepthState->Release();
 
 		for (auto target : m_Buffers)
 		{
@@ -127,6 +127,7 @@ namespace GBuffer
 	void SetViewMatrix(const DirectX::XMMATRIX& matrix)
 	{
 		using namespace DirectX;
+
 		XMMATRIX viewProj = matrix * m_Projection;
 		XMFLOAT4X4 viewProjection;
 		XMStoreFloat4x4(&viewProjection, XMMatrixTranspose(viewProj));
@@ -151,8 +152,8 @@ namespace GBuffer
 		Window::Context->ClearRenderTargetView(m_Buffers[1], clear);
 
 		Window::Context->OMSetRenderTargets(2, m_Buffers, m_DepthBuffer);
-		Window::Context->OMSetDepthStencilState(m_DepthState, 0);
-		Window::Context->VSSetShader(m_WriteVS, nullptr, 0);
+		Window::Context->OMSetDepthStencilState(DepthState, 0);
+		Window::Context->VSSetShader(WriteVS, nullptr, 0);
 		Window::Context->GSSetShader(nullptr, nullptr, 0);
 		Window::Context->PSSetShader(m_WritePS, nullptr, 0);
 		Window::Context->RSSetViewports(1, &Viewport);

@@ -4,8 +4,11 @@ struct Voxel
 	uint Normal;
 };
 
-SamplerState Sampler : register(s0);
 Texture3D<float4> VoxelTexture : register(t3);
+Texture2D ShadowMap : register(t4);
+
+SamplerState Sampler : register(s0);
+SamplerState ShadowMapSampler : register(s1);
 
 cbuffer ConstantBuffer : register(b0)
 {
@@ -25,6 +28,12 @@ cbuffer ConstantBuffer : register(b2)
 	float3 LightDirection;
 	float LightIntensity;
 	float3 LightColor;
+}
+
+cbuffer ConstantBuffer : register(b3)
+{
+	float4x4 ToLight;
+	float4x4 FromLight;
 }
 
 uint Flatten(uint3 coords, uint dimensions)
@@ -79,15 +88,6 @@ float4 DecodeColor(uint colorMask)
 
 uint EncodeNormal(float area, float3 normal)
 {
-	// int3 iNormal = int3(normal * 255.0f);
-	// uint3 iNormalSigns;
-	// iNormalSigns.x = (iNormal.x >> 5) & 0x04000000;
-	// iNormalSigns.y = (iNormal.y >> 14) & 0x00020000;
-	// iNormalSigns.z = (iNormal.z >> 23) & 0x00000100;
-	// iNormal = abs(iNormal);
-	// uint normalMask = iNormalSigns.x | (iNormal.x << 18) | iNormalSigns.y | (iNormal.y << 9) | iNormalSigns.z | iNormal.z;
-	// return normalMask;
-	
 	int3 iNormal = int3(normal * 255.f);
 	uint3 normalSigns;
 	normalSigns.x = (iNormal.x > 0);
@@ -104,28 +104,14 @@ uint EncodeNormal(float area, float3 normal)
 
 float3 DecodeNormal(uint mask)
 {
-	// int3 iNormal;
-	// iNormal.x = (normalMask >> 18) & 0x000000ff;
-	// iNormal.y = (normalMask >> 9) & 0x000000ff;
-	// iNormal.z = normalMask & 0x000000ff;
-	// int3 iNormalSigns;
-	// iNormalSigns.x = (normalMask >> 25) & 0x00000002;
-	// iNormalSigns.y = (normalMask >> 16) & 0x00000002;
-	// iNormalSigns.z = (normalMask >> 7) & 0x00000002;
-	// iNormalSigns = 1 - iNormalSigns;
-	// float3 normal = float3(iNormal) / 255.0f;
-	// normal *= iNormalSigns;
-	// return normal;
-	
 	int3 iNormal;
 	iNormal.x = (mask >> 3) & 0x000000ff;
 	iNormal.y = (mask >> 11) & 0x000000ff;
 	iNormal.z = (mask >> 19) & 0x000000ff;
 	
-	int3 normalSigns;
-	normalSigns.x = mask & 1;
-	normalSigns.y = (mask >> 1) & 1;
-	normalSigns.z = (mask >> 2) & 1;
+	int3 normalSigns = int3(mask & 1, (mask >> 1) & 1, (mask >> 2) & 1);
+	normalSigns += normalSigns;
+	normalSigns -= int3(-1, -1, -1);
 	
 	return (float3(iNormal) / 255.f) * normalSigns;
 }
@@ -154,6 +140,36 @@ static const float3 CONES[] =
 	float3(-0.182696, 0.388844, 0.903007),
 	float3(0.182696, -0.388844, 0.903007)
 };
+
+float Shadow(float3 worldPosition, float3 normal)
+{
+	float4 lightSpace = mul(float4(worldPosition, 1.f), ToLight);
+	lightSpace /= lightSpace.w;
+	
+	lightSpace.xy = lightSpace.xy * 0.5f + 0.5f;
+	
+	if (lightSpace.z > 1.f)
+	{
+		return 0.f;
+	}
+	
+	float bias = max(0.05f * (1.f - dot(normal, LightDirection)), 0.005f);
+	uint3 dimensions;
+	ShadowMap.GetDimensions(0, dimensions.x, dimensions.y, dimensions.z);
+	float2 texelSize = 1.f / dimensions.xy;
+	float shadow = 0.f;
+	[unroll]
+	for (int x = -2; x < 3; x++)
+	{
+		[unroll]
+		for (int y = -2; y < 3; y++)
+		{
+			float depth = ShadowMap.Sample(ShadowMapSampler, lightSpace.xy + float2(x, y) * texelSize).r;
+			shadow += depth > lightSpace.z + bias ? 1.f : 0.f;
+		}
+	}
+	return shadow / 25.f;
+}
 
 float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
 {
