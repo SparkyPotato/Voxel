@@ -43,8 +43,7 @@ float4 main(PSIn input) : SV_TARGET
 		phong += max(0.f, RdotV);
 	}
 	
-	return (float4(phong * LightColor, 1.f) // phong direct
-			* (1.f - Shadow(worldPosition, normal))
+	return (float4(phong * LightColor, 1.f) * (1.f - Shadow(worldPosition, normal))
 			+ ConeTraceRadiance(worldPosition, normal) // diffuse indirect
 			+ ConeTraceReflection(worldPosition, normal, view, (1.f - specular)) * specular // specular
 			) * float4(color, 1.f);

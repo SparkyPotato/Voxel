@@ -18,12 +18,13 @@ struct GSOut
 	float3 Bitangent : BITANGENT;
 	float2 UV : UV;
 	nointerpolation float Area : AREA;
+	nointerpolation float4 Plane : PLANE;
 };
 
 [maxvertexcount(3)]
 void main(triangle GSIn input[3], inout TriangleStream<GSOut> stream)
 {
-	float3 normal = abs(input[0].Normal + input[1].Normal + input[2].Normal);
+	float3 normal = normalize(abs(input[0].Normal + input[1].Normal + input[2].Normal));
 	uint max = normal[1] > normal[0] ? 1 : 0;
 	max = normal[2] > normal[max] ? 2 : max;
 	
@@ -31,6 +32,8 @@ void main(triangle GSIn input[3], inout TriangleStream<GSOut> stream)
 	float3 s2 = input[2].Position - input[0].Position;
 	float3 area = cross(s1, s2);
 	float areaSquared = dot(area, area);
+	
+	float4 plane = float4(normal, dot(normal, input[0].Position));
 
 	for (uint i = 0; i < 3; i++)
 	{
@@ -56,6 +59,7 @@ void main(triangle GSIn input[3], inout TriangleStream<GSOut> stream)
 		output.Bitangent = input[i].Bitangent;
 		output.UV = input[i].UV;
 		output.Area = areaSquared;
+		output.Plane = plane;
 
 		stream.Append(output);
 	}

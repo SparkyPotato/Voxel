@@ -228,11 +228,11 @@ namespace Voxel
 		Window::Device->CreateShaderResourceView(m_MidTexture, &rDesc, &m_MidReadView);
 
 		D3D11_BUFFER_DESC bDesc{
-			.ByteWidth = 8 * res * res * res,
+			.ByteWidth = 12 * res * res * res,
 			.Usage = D3D11_USAGE_DEFAULT,
 			.BindFlags = D3D11_BIND_UNORDERED_ACCESS,
 			.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
-			.StructureByteStride = 8
+			.StructureByteStride = 12
 		};
 		Window::Device->CreateBuffer(&bDesc, nullptr, &m_VoxelBuffer);
 

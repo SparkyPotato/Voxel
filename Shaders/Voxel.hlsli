@@ -1,7 +1,7 @@
 struct Voxel
 {
 	uint Direct;
-	uint Normal;
+	uint2 Plane;
 };
 
 Texture3D<float4> VoxelTexture : register(t3);
@@ -86,34 +86,39 @@ float4 DecodeColor(uint colorMask)
 	return color;
 }
 
-uint EncodeNormal(float area, float3 normal)
+uint2 EncodePlane(float area, float4 plane, float3 voxelCorner)
 {
-	int3 iNormal = int3(normal * 255.f);
-	uint3 normalSigns;
-	normalSigns.x = (iNormal.x > 0);
-	normalSigns.y = (iNormal.y > 0) << 1;
-	normalSigns.z = (iNormal.z > 0) << 2;
-	iNormal = abs(iNormal);
+	float normalizedArea = area / (3.4641f * VoxelHalfExtent * VoxelHalfExtent);
+	uint intArea = normalizedArea * 255.f;
+	uint2 output = uint2(intArea << 24, intArea << 24);
 	
-	uint mask = normalSigns.x | normalSigns.y | normalSigns.z | (iNormal.x << 3) | (iNormal.y << 11) | (iNormal.z << 19);
-	uint areaMask = (area / (VoxelHalfExtent * 2.f)) * 32;
-	mask |= areaMask << 27;
+	uint3 normalSigns = uint3(plane.x > 0.f, plane.y > 0.f, plane.z > 0.f);
+	uint3 intNormal = abs(plane.xyz) * 2047.f;
 	
-	return mask;
+	float t = plane.z - length(voxelCorner);
+	float normalizedT = t / (3.4641f * VoxelHalfExtent);
+	uint intT = abs(normalizedT) * 2047.f;
+	
+	output.x |= normalSigns.x | (normalSigns.y << 1) | (intNormal.x << 2) | (intNormal.y << 13);
+	output.y |= normalSigns.z | ((t > 0.f) << 1) | (intNormal.z << 2) | (intT << 13);
+	
+	// x: normal.x > 0 | normal.y > 0 | normal.x | normal.y | area
+	// y: normal.z > 0 | t > 0 | normal.z | t | area
+	return output;
 }
 
-float3 DecodeNormal(uint mask)
+float4 DecodePlane(uint2 mask)
 {
-	int3 iNormal;
-	iNormal.x = (mask >> 3) & 0x000000ff;
-	iNormal.y = (mask >> 11) & 0x000000ff;
-	iNormal.z = (mask >> 19) & 0x000000ff;
+	uint3 normalSigns = uint3(mask.x & 1, (mask.x >> 1) & 1, mask.y & 1);
+	uint3 intNormal = uint3((mask.x >> 2) & 0x7ff, (mask.x >> 13) & 0x7ff, (mask.y >> 2) & 0x7ff);
+	float3 normal = intNormal / 2047.f;
+	normal = float3(normalSigns.x ? normal.x : -normal.x, normalSigns.y ? normal.y : -normal.y, normalSigns.z ? normal.z : -normal.z);
 	
-	int3 normalSigns = int3(mask & 1, (mask >> 1) & 1, (mask >> 2) & 1);
-	normalSigns += normalSigns;
-	normalSigns -= int3(-1, -1, -1);
+	uint intT = (mask.y >> 13) & 0x7ff;
+	float t = (intT / 2047.f) * 3.4641f * VoxelHalfExtent;
+	t = (mask.y >> 1) & 1 ? t : -t;
 	
-	return (float3(iNormal) / 255.f) * normalSigns;
+	return float4(normal, t);
 }
 
 bool IsSaturated(float3 a)
@@ -159,10 +164,10 @@ float Shadow(float3 worldPosition, float3 normal)
 	float2 texelSize = 1.f / dimensions.xy;
 	float shadow = 0.f;
 	[unroll]
-	for (int x = -2; x < 3; x++)
+	for (int x = -1; x < 2; x++)
 	{
 		[unroll]
-		for (int y = -2; y < 3; y++)
+		for (int y = -1; y < 2; y++)
 		{
 			float depth = ShadowMap.Sample(ShadowMapSampler, lightSpace.xy + float2(x, y) * texelSize).r;
 			shadow += depth > lightSpace.z + bias ? 1.f : 0.f;
@@ -173,14 +178,16 @@ float Shadow(float3 worldPosition, float3 normal)
 
 float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
 {
-	float3 color = 0;
-	float alpha = 0;
+	float4 color = 0;
 	
 	float dist = VoxelHalfExtent; // offset by cone dir so that first sample of all cones are not the same
-	float3 startPos = P + N * VoxelHalfExtent * 2.f * 1.41421f; // sqrt2 is diagonal voxel half-extent
+	float3 startPos = P + N * VoxelHalfExtent * 3.464f; // sqrt2 is diagonal voxel half-extent
 
+	uint _, maxMips;
+	VoxelTexture.GetDimensions(0, _, _, _, maxMips);
+	
 	float maxDistance = VoxelHalfExtent * 2.f * VoxelGridRes;
-	while (dist < maxDistance && alpha < 1.f)
+	while (dist < maxDistance && color.a < 1.f)
 	{
 		float diameter = max(VoxelHalfExtent, 2 * coneAperture * dist);
 		float mip = log2(diameter / VoxelHalfExtent);
@@ -190,19 +197,18 @@ float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
 		tc /= VoxelGridRes;
 		tc = tc * float3(0.5f, -0.5f, 0.5f) + 0.5f;
 
-		if (!IsSaturated(tc) || mip >= (float) 9.f)
+		if (!IsSaturated(tc) || mip >= float(maxMips))
 			break;
 
-		float4 sam = VoxelTexture.SampleLevel(Sampler, tc, mip);
+		float4 sample = VoxelTexture.SampleLevel(Sampler, tc, mip);
 
-		float a = 1 - alpha;
-		color += a * sam.rgb;
-		alpha += a * sam.a;
+		float a = 1.f - color.a;
+		color += a * sample;
 
 		dist += diameter * (VoxelHalfExtent / 32.f);
 	}
 
-	return float4(color, alpha);
+	return float4(color);
 }
 
 float4 ConeTraceRadiance(float3 P, float3 N)
@@ -212,8 +218,7 @@ float4 ConeTraceRadiance(float3 P, float3 N)
 	for (uint cone = 0; cone < 16; cone++) // quality is between 1 and 16 cones
 	{
 		float3 coneDirection = normalize(CONES[cone] + N);
-		// flip if pointing below
-		coneDirection *= dot(coneDirection, N) < 0 ? -1 : 1;
+		coneDirection *= dot(coneDirection, N) < 0 ? -1 : 1; // flip if pointing below
 
 		radiance += ConeTrace(P, N, coneDirection, tan(3.141527f * 0.5f * 0.33f));
 	}
@@ -227,7 +232,7 @@ float4 ConeTraceRadiance(float3 P, float3 N)
 
 float4 ConeTraceReflection(float3 P, float3 N, float3 V, float roughness)
 {
-	float aperture = tan(roughness * 3.1415 * 0.5f * 0.1f);
+	float aperture = tan(roughness * 3.1415f * 0.05f);
 	float3 coneDirection = reflect(-V, N);
 
 	float4 reflection = ConeTrace(P, N, coneDirection, aperture);

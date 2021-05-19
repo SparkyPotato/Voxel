@@ -10,7 +10,7 @@ void main(uint3 id : SV_DispatchThreadID)
 	
 	if (emission.a > 0.f)
 	{
-		float3 normal = DecodeNormal(VoxelGrid[Flatten(id, VoxelGridRes)].Normal);
+		float4 plane = DecodePlane(VoxelGrid[Flatten(id, VoxelGridRes)].Plane);
 		
 		float3 P = ((float3) id + 0.5f) / VoxelGridRes;
 		P = P * 2 - 1;
@@ -19,12 +19,10 @@ void main(uint3 id : SV_DispatchThreadID)
 		P *= VoxelGridRes;
 		// P += CameraPosition;
 		
-		float4 radiance = ConeTraceRadiance(P, normal);
+		float4 radiance = ConeTraceRadiance(P, plane.xyz);
 
-		DirectTexture[id] = emission + float4(radiance.rgb, 0);
+		emission += float4(radiance.rgb, 0);
 	}
-	else
-	{
-		DirectTexture[id] = 0.f;
-	}
+	
+	DirectTexture[id] = emission;
 }
