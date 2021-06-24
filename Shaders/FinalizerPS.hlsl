@@ -1,8 +1,8 @@
+#include "Voxel.hlsli"
+
 Texture2D Albedo : register(t0);
 Texture2D Normal : register(t1);
 Texture2D Depth : register(t2);
-
-#include "Voxel.hlsli"
 
 struct PSIn
 {
@@ -45,6 +45,6 @@ float4 main(PSIn input) : SV_TARGET
 	
 	return (float4(phong * LightColor, 1.f) * (1.f - Shadow(worldPosition, normal))
 			+ ConeTraceRadiance(worldPosition, normal) // diffuse indirect
-			+ ConeTraceReflection(worldPosition, normal, view, (1.f - specular)) * specular // specular
+//			+ ConeTraceReflection(worldPosition, normal, view, (1.f - specular)) * specular // specular
 			) * float4(color, 1.f);
 }

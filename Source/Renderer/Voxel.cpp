@@ -88,9 +88,9 @@ namespace Voxel
 		m_DiffuseTexture->Release();
 		DiffuseReadView->Release();
 		m_DiffuseTextureView->Release();
-		if (m_MidTexture) m_DiffuseTexture->Release();
-		if (m_MidReadView) DiffuseReadView->Release();
-		if (m_MidTextureView) m_DiffuseTextureView->Release();
+		if (m_MidTexture) m_MidTexture->Release();
+		if (m_MidReadView) m_MidReadView->Release();
+		if (m_MidTextureView) m_MidTextureView->Release();
 		m_VoxelBuffer->Release();
 		m_VoxelView->Release();
 
@@ -147,6 +147,8 @@ namespace Voxel
 		Window::Context->CSSetShader(m_CopyCS, nullptr, 0);
 		Window::Context->CSSetConstantBuffers(1, 1, &ConstantBuffer);
 		Window::Context->CSSetUnorderedAccessViews(0, 1, &m_VoxelView, nullptr);
+		ID3D11ShaderResourceView* view = nullptr;
+		Window::Context->CSSetShaderResources(3, 1, &view);
 		Window::Context->CSSetUnorderedAccessViews(1, 1, &m_MidTextureView, nullptr);
 		auto dimensions = uint32_t(m_CBuffer.VoxelGridRes) / 8 + 1;
 		Window::Context->Dispatch(dimensions, dimensions, dimensions);
@@ -193,9 +195,9 @@ namespace Voxel
 		if (m_DiffuseTexture) m_DiffuseTexture->Release();
 		if (DiffuseReadView) DiffuseReadView->Release();
 		if (m_DiffuseTextureView) m_DiffuseTextureView->Release();
-		if (m_MidTexture) m_DiffuseTexture->Release();
-		if (m_MidReadView) DiffuseReadView->Release();
-		if (m_MidTextureView) m_DiffuseTextureView->Release();
+		if (m_MidTexture) m_MidTexture->Release();
+		if (m_MidReadView) m_MidReadView->Release();
+		if (m_MidTextureView) m_MidTextureView->Release();
 		if (m_VoxelBuffer) m_VoxelBuffer->Release();
 		if (m_VoxelView) m_VoxelView->Release();
 
