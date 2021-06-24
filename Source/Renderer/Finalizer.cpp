@@ -39,7 +39,7 @@ namespace Finalizer
 		Window::Context->PSSetShaderResources(3, 1, &Voxel::DiffuseReadView);
 		Window::Context->PSSetShaderResources(4, 1, &ShadowMap::ShadowMapView);
 		Window::Context->PSSetSamplers(0, 1, &GBuffer::SamplerState);
-		Window::Context->PSSetSamplers(2, 1, &ShadowMap::Sampler);
+		Window::Context->PSSetSamplers(1, 1, &ShadowMap::Sampler);
 		Window::Context->IASetVertexBuffers(0, 0, nullptr, &offset, &offset);
 		Window::Context->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
 		Window::Context->IASetInputLayout(nullptr);

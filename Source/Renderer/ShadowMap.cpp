@@ -137,6 +137,8 @@ namespace ShadowMap
 		float clear[] = { 0.f, 0.f, 0.f, 0.f };
 		Window::Context->ClearDepthStencilView(m_ShadowMapDSV, D3D11_CLEAR_DEPTH, 0.f, 0);
 
+		ID3D11ShaderResourceView* view = nullptr;
+		Window::Context->PSSetShaderResources(4, 1, &view);
 		ID3D11RenderTargetView* views[] = { nullptr, nullptr };
 		Window::Context->OMSetRenderTargets(2, views, m_ShadowMapDSV);
 		Window::Context->OMSetDepthStencilState(GBuffer::DepthState, 0);

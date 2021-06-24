@@ -158,28 +158,29 @@ float Shadow(float3 worldPosition, float3 normal)
 		return 0.f;
 	}
 	
-	float bias = max(0.05f * (1.f - dot(normal, LightDirection)), 0.005f);
+	// float bias = max(0.05f * (1.f - dot(normal, LightDirection)), 0.005f);
+	float bias = 0.f;
 	uint3 dimensions;
 	ShadowMap.GetDimensions(0, dimensions.x, dimensions.y, dimensions.z);
-	float2 texelSize = 1.f / dimensions.xy;
-	float shadow = 0.f;
-	[unroll]
-	for (int x = -1; x < 2; x++)
-	{
-		[unroll]
-		for (int y = -1; y < 2; y++)
-		{
-			float depth = ShadowMap.Sample(ShadowMapSampler, lightSpace.xy + float2(x, y) * texelSize).r;
-			shadow += depth > lightSpace.z + bias ? 1.f : 0.f;
-		}
-	}
-	return shadow / 25.f;
+//	float2 texelSize = 1.f / dimensions.xy;
+//	float shadow = 0.f;
+//	[unroll]
+//	for (int x = -1; x < 2; x++)
+//	{
+//		[unroll]
+//		for (int y = -1; y < 2; y++)
+//		{
+//			float depth = ShadowMap.Sample(ShadowMapSampler, lightSpace.xy + float2(x, y) * texelSize).r;
+//			shadow += depth > lightSpace.z + bias ? 1.f : 0.f;
+//		}
+//	}
+//	return shadow / 25.f;
+	
+	return ShadowMap.Sample(ShadowMapSampler, lightSpace.xy).r > lightSpace.z + bias ? 1.f : 0.f;
 }
 
 float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
-{
-	float4 color = 0;
-	
+{	
 	float dist = VoxelHalfExtent; // offset by cone dir so that first sample of all cones are not the same
 	float3 startPos = P + N * VoxelHalfExtent * 3.464f; // sqrt2 is diagonal voxel half-extent
 
@@ -187,7 +188,7 @@ float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
 	VoxelTexture.GetDimensions(0, _, _, _, maxMips);
 	
 	float maxDistance = VoxelHalfExtent * 2.f * VoxelGridRes;
-	while (dist < maxDistance && color.a < 1.f)
+	while (dist < maxDistance)
 	{
 		float diameter = max(VoxelHalfExtent, 2 * coneAperture * dist);
 		float mip = log2(diameter / VoxelHalfExtent);
@@ -198,23 +199,26 @@ float4 ConeTrace(float3 P, float3 N, float3 coneDirection, float coneAperture)
 		tc = tc * float3(0.5f, -0.5f, 0.5f) + 0.5f;
 
 		if (!IsSaturated(tc) || mip >= float(maxMips))
-			break;
+			return 0.f;
 
 		float4 sample = VoxelTexture.SampleLevel(Sampler, tc, mip);
+		if (sample.a != 0.f)
+		{
+			return sample;
+		}
 
-		float a = 1.f - color.a;
-		color += a * sample;
-
-		dist += diameter * (VoxelHalfExtent / 32.f);
+		// dist += diameter * (VoxelHalfExtent / 32.f);
+		dist += VoxelHalfExtent * 2.f;
 	}
-
-	return float4(color);
+	
+	return 0.f;
 }
 
 float4 ConeTraceRadiance(float3 P, float3 N)
 {
 	float4 radiance = 0;
 
+	[unroll]
 	for (uint cone = 0; cone < 16; cone++) // quality is between 1 and 16 cones
 	{
 		float3 coneDirection = normalize(CONES[cone] + N);

@@ -143,9 +143,9 @@ Scene::Scene(const std::string& path)
 		bool albedoTex = false;
 		bool specularTex = false;
 		bool bumpTex = false;
-		float albedoColor[4];
-		float specularColor[4];
-		float bumpColor[4];
+		uint8_t albedoColor[4];
+		uint8_t specularColor[4];
+		uint8_t bumpColor[4];
 
 		if (mat->GetTextureCount(aiTextureType_DIFFUSE))
 		{
@@ -157,10 +157,10 @@ Scene::Scene(const std::string& path)
 		{
 			aiColor3D color;
 			mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);
-			albedoColor[0] = color.r;
-			albedoColor[1] = color.g;
-			albedoColor[2] = color.b;
-			albedoColor[3] = 1.f;
+			albedoColor[0] = color.r * 255;
+			albedoColor[1] = color.g * 255;
+			albedoColor[2] = color.b * 255;
+			albedoColor[3] = 255;
 
 			albedo.Data = albedoColor;
 			albedo.Width = albedo.Height = 1;
@@ -176,10 +176,10 @@ Scene::Scene(const std::string& path)
 		{
 			aiColor3D color;
 			mat->Get(AI_MATKEY_COLOR_SPECULAR, color);
-			specularColor[0] = color.r;
-			specularColor[1] = color.g;
-			specularColor[2] = color.b;
-			specularColor[3] = 1.f;
+			specularColor[0] = color.r * 255;
+			specularColor[1] = color.g * 255;
+			specularColor[2] = color.b * 255;
+			specularColor[3] = 255;
 
 			specular.Data = specularColor;
 			specular.Width = specular.Height = 1;
@@ -193,10 +193,10 @@ Scene::Scene(const std::string& path)
 		}
 		else
 		{
-			bumpColor[0] = 0.5f;
-			bumpColor[1] = 0.5f;
-			bumpColor[2] = 0.5f;
-			bumpColor[3] = 1.f;
+			bumpColor[0] = 127;
+			bumpColor[1] = 127;
+			bumpColor[2] = 127;
+			bumpColor[3] = 255;
 
 			bump.Data = bumpColor;
 			bump.Width = bump.Height = 1;

@@ -1,7 +1,7 @@
 #include "Voxel.hlsli"
 
 RWStructuredBuffer<Voxel> VoxelGrid : register(u0);
-RWTexture3D<float4> DirectTexture : register(u1);
+RWTexture3D<unorm float4> DirectTexture : register(u1);
 
 [numthreads(8, 8, 8)]
 void main(uint3 id : SV_DispatchThreadID)
